@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <title>夕食残りカロリー</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111827;background:#f3f4f6}
+    body{margin:0;padding:16px;max-width:760px;margin-inline:auto}
+    h1{font-size:1.35rem;margin:0 0 12px}
+    .card{background:#fff;border-radius:18px;padding:16px;box-shadow:0 4px 18px rgba(0,0,0,.06);margin-bottom:14px}
+    .top{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+    .goal input{width:110px;font-size:1.1rem;padding:10px;border:1px solid #d1d5db;border-radius:10px}
+    .remain{font-size:2.2rem;font-weight:800;line-height:1.05;text-align:right}
+    .remain small{display:block;font-size:.8rem;font-weight:600;color:#6b7280;margin-bottom:4px}
+    .section h2{font-size:1rem;margin:0 0 10px}
+    .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 4px;border-top:1px solid #eef2f7}
+    .item:first-of-type{border-top:none}
+    .left{display:flex;align-items:center;gap:12px;min-width:0}
+    input[type=checkbox]{width:28px;height:28px;accent-color:#111827;flex:none}
+    .name{font-weight:650}
+    .kcal{color:#6b7280;white-space:nowrap}
+    .subtotal{display:flex;justify-content:space-between;font-weight:700;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb}
+    .actions{display:flex;gap:10px;flex-wrap:wrap}
+    button{border:none;border-radius:12px;padding:11px 14px;font-weight:700;font-size:.95rem;background:#111827;color:#fff}
+    button.secondary{background:#e5e7eb;color:#111827}
+    .used{font-size:.9rem;color:#6b7280;margin-top:6px;text-align:right}
+    .neg{color:#b91c1c}
+    .hint{font-size:.8rem;color:#6b7280;margin-top:8px;line-height:1.5}
+  </style>
+</head>
+<body>
+  <h1>夕食に残せるカロリー</h1>
+  <div class="card top">
+    <div class="goal">
+      <label for="goal"><strong>1日の目標</strong></label><br>
+      <input id="goal" type="number" min="500" step="10" value="2000" /> kcal
+    </div>
+    <div>
+      <div id="remain" class="remain"><small>夕食に残せる</small>2000 kcal</div>
+      <div id="used" class="used">夕食前まで 0 kcal</div>
+    </div>
+  </div>
+
+  <div id="sections"></div>
+
+  <div class="card">
+    <div class="actions">
+      <button id="reset">今日をリセット</button>
+      <button id="resetGoal" class="secondary">目標を2000に戻す</button>
+    </div>
+    <div class="hint">チェック状態と目標値はこの端末に保存されます。ホーム画面に追加するとアプリのように使えます。</div>
+  </div>
+
+<script>
+const foods = [
+  {name:'クエン酸チャージ', kcal:40},
+  {name:'ザバス', kcal:150},
+  {name:'バナナ 1本', kcal:90},
+  {name:'パン 1枚', kcal:150},
+  {name:'フルグラ＋牛乳', kcal:400},
+  {name:'ヨーグルト', kcal:60},
+  {name:'野菜ジュース', kcal:40},
+  {name:'ヤクルト', kcal:50},
+  {name:'カロリーメイト 2本', kcal:200},
+  {name:'ご飯 1杯', kcal:230},
+  {name:'ケーキ 1切れ', kcal:300}
+];
+const meals=['朝','昼','間食'];
+const state=JSON.parse(localStorage.getItem('calorieState')||'{}');
+if(!state.goal) state.goal=2000;
+if(!state.checked) state.checked={};
+
+function save(){localStorage.setItem('calorieState',JSON.stringify(state));}
+function key(meal,i){return meal+'-'+i}
+function render(){
+  document.getElementById('goal').value=state.goal;
+  const root=document.getElementById('sections'); root.innerHTML='';
+  let total=0;
+  meals.forEach(meal=>{
+    let sub=0;
+    const card=document.createElement('div'); card.className='card section';
+    card.innerHTML=`<h2>${meal}</h2>`;
+    foods.forEach((f,i)=>{
+      const k=key(meal,i), checked=!!state.checked[k]; if(checked){sub+=f.kcal; total+=f.kcal;}
+      const row=document.createElement('label'); row.className='item';
+      row.innerHTML=`<span class="left"><input type="checkbox" data-key="${k}" ${checked?'checked':''}><span class="name">${f.name}</span></span><span class="kcal">${f.kcal} kcal</span>`;
+      card.appendChild(row);
+    });
+    const foot=document.createElement('div'); foot.className='subtotal'; foot.innerHTML=`<span>${meal} 合計</span><span>${sub} kcal</span>`; card.appendChild(foot);
+    root.appendChild(card);
+  });
+  const remain=state.goal-total;
+  const r=document.getElementById('remain'); r.innerHTML=`<small>夕食に残せる</small>${remain} kcal`; r.classList.toggle('neg',remain<0);
+  document.getElementById('used').textContent=`夕食前まで ${total} kcal`;
+  document.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change',e=>{state.checked[e.target.dataset.key]=e.target.checked;save();render();}));
+}
+
+document.getElementById('goal').addEventListener('change',e=>{state.goal=Math.max(0,Number(e.target.value)||0);save();render();});
+document.getElementById('reset').addEventListener('click',()=>{state.checked={};save();render();});
+document.getElementById('resetGoal').addEventListener('click',()=>{state.goal=2000;save();render();});
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+render();
+</script>
+</body>
+</html>
