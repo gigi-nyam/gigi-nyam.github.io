@@ -35,6 +35,14 @@
     .badge{font-size:.68rem;line-height:1;padding:3px 6px;border-radius:999px;background:#e5e7eb;color:#374151;font-weight:700}
     .badge.current{background:#111827;color:#fff}
     .kcal{color:#6b7280;white-space:nowrap}
+    .add-food{width:100%;margin-top:12px}
+    .add-form{margin-top:12px;padding-top:14px;border-top:1px solid #e5e7eb}
+    .add-form[hidden]{display:none}
+    .form-grid{display:grid;grid-template-columns:minmax(0,1fr) 105px;gap:10px;margin-bottom:10px}
+    .field label{display:block;font-size:.78rem;font-weight:700;color:#4b5563;margin-bottom:5px}
+    .field input{box-sizing:border-box;width:100%;padding:11px 10px;border:1px solid #d1d5db;border-radius:10px;font:inherit;background:#fff}
+    .field input:focus{outline:2px solid #111827;outline-offset:1px}
+    .form-actions{display:flex;justify-content:flex-end;gap:8px}
     .actions{display:flex;gap:10px;flex-wrap:wrap}
     button{border:none;border-radius:12px;padding:11px 14px;font-weight:700;font-size:.95rem;background:#111827;color:#fff}
     button.secondary{background:#e5e7eb;color:#111827}
@@ -64,6 +72,23 @@
       <span class="section-note">タップで選択</span>
     </div>
     <div id="foodList"></div>
+    <button id="addFood" class="secondary add-food" type="button" aria-expanded="false">＋ 食品を追加</button>
+    <form id="addFoodForm" class="add-form" hidden>
+      <div class="form-grid">
+        <div class="field">
+          <label for="foodName">食品名</label>
+          <input id="foodName" type="text" maxlength="40" autocomplete="off" required placeholder="例：ゆで卵">
+        </div>
+        <div class="field">
+          <label for="foodKcal">カロリー</label>
+          <input id="foodKcal" type="number" min="1" max="5000" step="1" inputmode="numeric" required placeholder="kcal">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button id="cancelAddFood" class="secondary" type="button">キャンセル</button>
+        <button type="submit">追加する</button>
+      </div>
+    </form>
   </div>
 
   <div class="card">
@@ -75,7 +100,7 @@
   </div>
 
 <script>
-const foods = [
+const defaultFoods = [
   {name:'クエン酸チャージ', kcal:40},
   {name:'ザバス', kcal:150},
   {name:'バナナ 1本', kcal:90},
@@ -92,7 +117,9 @@ const meals=['朝','昼','間食'];
 const state=JSON.parse(localStorage.getItem('calorieState')||'{}');
 if(!state.goal) state.goal=2000;
 if(!state.checked) state.checked={};
+if(!Array.isArray(state.customFoods)) state.customFoods=[];
 if(!meals.includes(state.activeMeal)) state.activeMeal='朝';
+let foods=defaultFoods.concat(state.customFoods);
 
 function save(){localStorage.setItem('calorieState',JSON.stringify(state));}
 function key(meal,i){return meal+'-'+i}
@@ -132,6 +159,28 @@ function render(){
 document.getElementById('goal').addEventListener('input',e=>{state.goal=Math.max(0,Number(e.target.value)||0);save();render();});
 document.getElementById('reset').addEventListener('click',()=>{state.checked={};save();render();});
 document.getElementById('resetGoal').addEventListener('click',()=>{state.goal=2000;save();render();});
+const addFoodButton=document.getElementById('addFood');
+const addFoodForm=document.getElementById('addFoodForm');
+function setAddFoodOpen(open){
+  addFoodForm.hidden=!open;
+  addFoodButton.setAttribute('aria-expanded',open);
+  addFoodButton.textContent=open?'追加を閉じる':'＋ 食品を追加';
+  if(open) document.getElementById('foodName').focus();
+}
+addFoodButton.addEventListener('click',()=>setAddFoodOpen(addFoodForm.hidden));
+document.getElementById('cancelAddFood').addEventListener('click',()=>{addFoodForm.reset();setAddFoodOpen(false);});
+addFoodForm.addEventListener('submit',e=>{
+  e.preventDefault();
+  const name=document.getElementById('foodName').value.trim();
+  const kcal=Math.round(Number(document.getElementById('foodKcal').value));
+  if(!name || kcal<1 || kcal>5000) return;
+  state.customFoods.push({name,kcal});
+  foods=defaultFoods.concat(state.customFoods);
+  save();
+  addFoodForm.reset();
+  setAddFoodOpen(false);
+  render();
+});
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 render();
 </script>
