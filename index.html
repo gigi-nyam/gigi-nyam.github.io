@@ -16,14 +16,25 @@
     .goal input{width:110px;font-size:1.1rem;padding:10px;border:1px solid #d1d5db;border-radius:10px}
     .remain{font-size:2.2rem;font-weight:800;line-height:1.05;text-align:right}
     .remain small{display:block;font-size:.8rem;font-weight:600;color:#6b7280;margin-bottom:4px}
-    .section h2{font-size:1rem;margin:0 0 10px}
-    .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 4px;border-top:1px solid #eef2f7}
+    .meal-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+    .meal-tab{background:#fff;color:#374151;border:2px solid transparent;padding:10px 6px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+    .meal-tab[aria-selected=true]{border-color:#111827;color:#111827;background:#f9fafb}
+    .meal-tab span{display:block;font-size:.78rem;color:#6b7280;margin-top:2px}
+    .meal-tab[aria-selected=true] span{color:#374151}
+    .section-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:5px}
+    .section h2{font-size:1.05rem;margin:0}
+    .section-note{font-size:.78rem;color:#6b7280}
+    .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 4px;border-top:1px solid #eef2f7;cursor:pointer}
     .item:first-of-type{border-top:none}
+    .item:has(input:checked){background:#f9fafb}
     .left{display:flex;align-items:center;gap:12px;min-width:0}
+    .food-info{min-width:0}
     input[type=checkbox]{width:28px;height:28px;accent-color:#111827;flex:none}
     .name{font-weight:650}
+    .badges{display:flex;gap:4px;min-height:18px;margin-top:4px;flex-wrap:wrap}
+    .badge{font-size:.68rem;line-height:1;padding:3px 6px;border-radius:999px;background:#e5e7eb;color:#374151;font-weight:700}
+    .badge.current{background:#111827;color:#fff}
     .kcal{color:#6b7280;white-space:nowrap}
-    .subtotal{display:flex;justify-content:space-between;font-weight:700;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb}
     .actions{display:flex;gap:10px;flex-wrap:wrap}
     button{border:none;border-radius:12px;padding:11px 14px;font-weight:700;font-size:.95rem;background:#111827;color:#fff}
     button.secondary{background:#e5e7eb;color:#111827}
@@ -45,7 +56,15 @@
     </div>
   </div>
 
-  <div id="sections"></div>
+  <div id="mealTabs" class="meal-tabs" role="tablist" aria-label="食事を選択"></div>
+
+  <div class="card section">
+    <div class="section-head">
+      <h2 id="foodTitle">朝の食品</h2>
+      <span class="section-note">タップで選択</span>
+    </div>
+    <div id="foodList"></div>
+  </div>
 
   <div class="card">
     <div class="actions">
@@ -73,33 +92,44 @@ const meals=['朝','昼','間食'];
 const state=JSON.parse(localStorage.getItem('calorieState')||'{}');
 if(!state.goal) state.goal=2000;
 if(!state.checked) state.checked={};
+if(!meals.includes(state.activeMeal)) state.activeMeal='朝';
 
 function save(){localStorage.setItem('calorieState',JSON.stringify(state));}
 function key(meal,i){return meal+'-'+i}
+function mealTotal(meal){
+  return foods.reduce((sum,f,i)=>sum+(state.checked[key(meal,i)]?f.kcal:0),0);
+}
 function render(){
   document.getElementById('goal').value=state.goal;
-  const root=document.getElementById('sections'); root.innerHTML='';
-  let total=0;
+  const tabs=document.getElementById('mealTabs'); tabs.innerHTML='';
+  const totals={};
   meals.forEach(meal=>{
-    let sub=0;
-    const card=document.createElement('div'); card.className='card section';
-    card.innerHTML=`<h2>${meal}</h2>`;
-    foods.forEach((f,i)=>{
-      const k=key(meal,i), checked=!!state.checked[k]; if(checked){sub+=f.kcal; total+=f.kcal;}
-      const row=document.createElement('label'); row.className='item';
-      row.innerHTML=`<span class="left"><input type="checkbox" data-key="${k}" ${checked?'checked':''}><span class="name">${f.name}</span></span><span class="kcal">${f.kcal} kcal</span>`;
-      card.appendChild(row);
-    });
-    const foot=document.createElement('div'); foot.className='subtotal'; foot.innerHTML=`<span>${meal} 合計</span><span>${sub} kcal</span>`; card.appendChild(foot);
-    root.appendChild(card);
+    totals[meal]=mealTotal(meal);
+    const tab=document.createElement('button');
+    tab.className='meal-tab'; tab.type='button'; tab.role='tab';
+    tab.setAttribute('aria-selected',meal===state.activeMeal);
+    tab.innerHTML=`${meal}<span>${totals[meal]} kcal</span>`;
+    tab.addEventListener('click',()=>{state.activeMeal=meal;save();render();});
+    tabs.appendChild(tab);
   });
+  const root=document.getElementById('foodList'); root.innerHTML='';
+  document.getElementById('foodTitle').textContent=`${state.activeMeal}の食品`;
+  foods.forEach((f,i)=>{
+    const k=key(state.activeMeal,i), checked=!!state.checked[k];
+    const selectedMeals=meals.filter(meal=>state.checked[key(meal,i)]);
+    const row=document.createElement('label'); row.className='item';
+    const badges=selectedMeals.map(meal=>`<span class="badge ${meal===state.activeMeal?'current':''}">${meal}✓</span>`).join('');
+    row.innerHTML=`<span class="left"><input type="checkbox" data-key="${k}" ${checked?'checked':''} aria-label="${state.activeMeal}の${f.name}"><span class="food-info"><span class="name">${f.name}</span><span class="badges">${badges}</span></span></span><span class="kcal">${f.kcal} kcal</span>`;
+    root.appendChild(row);
+  });
+  const total=meals.reduce((sum,meal)=>sum+totals[meal],0);
   const remain=state.goal-total;
   const r=document.getElementById('remain'); r.innerHTML=`<small>夕食に残せる</small>${remain} kcal`; r.classList.toggle('neg',remain<0);
   document.getElementById('used').textContent=`夕食前まで ${total} kcal`;
   document.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.addEventListener('change',e=>{state.checked[e.target.dataset.key]=e.target.checked;save();render();}));
 }
 
-document.getElementById('goal').addEventListener('change',e=>{state.goal=Math.max(0,Number(e.target.value)||0);save();render();});
+document.getElementById('goal').addEventListener('input',e=>{state.goal=Math.max(0,Number(e.target.value)||0);save();render();});
 document.getElementById('reset').addEventListener('click',()=>{state.checked={};save();render();});
 document.getElementById('resetGoal').addEventListener('click',()=>{state.goal=2000;save();render();});
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
